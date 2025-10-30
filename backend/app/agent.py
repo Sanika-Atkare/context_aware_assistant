@@ -1,32 +1,42 @@
-# backend/app/agent.py
-"""
-Very small agent that:
-- stores the turn in memory (in-memory for now)
-- looks for keywords to call calendar_tool.create_event
-- otherwise returns an echo reply
-"""
-from app import memory
-from app.tools.calendar_tool import create_event_stub
-from datetime import datetime, timedelta
+memory = {}
 
 def handle_user_message(user_id: int, text: str):
-    # 1) Save turn to short-term memory
-    memory.add_turn(user_id, text)
+    """
+    Handles user messages with simple context memory.
+    """
 
-    # 2) Very naive intent detection
-    lowered = text.lower()
+    user_history = memory.get(user_id, [])
 
-    if "schedule" in lowered or "reschedule" in lowered or "meeting" in lowered:
-        # For MVP we will parse a few simple phrases by heuristics.
-        # Example user input: "Schedule meeting tomorrow at 4pm with Raj"
-        # This stub will schedule for tomorrow at 16:00 if we can't parse date.
-        # (Replace this with robust parsing or an LLM later.)
-        start = datetime.utcnow() + timedelta(days=1)
-        start = start.replace(hour=16, minute=0, second=0, microsecond=0)
-        end = start + timedelta(hours=1)
-        event = create_event_stub(summary=text[:80], start_dt=start, end_dt=end)
-        reply = f"OK — scheduled (stub). Title: {event['summary']}. Start: {event['start']}"
-        return {"reply": reply, "memory_hits": memory.get_recent(user_id)}
+    # Save current message
+    user_history.append({"role": "user", "text": text})
+    memory[user_id] = user_history
 
-    # default: echo with memory hits
-    return {"reply": f"I heard: {text}", "memory_hits": memory.get_recent(user_id)}
+    # Simple logic
+    text_lower = text.lower()
+
+    # 1️⃣ Schedule meeting
+    if "schedule" in text_lower and "meeting" in text_lower:
+        reply = "✅ Meeting scheduled for tomorrow at 4:00 PM."
+    
+    # 2️⃣ Remember user's name
+    elif "my name is" in text_lower:
+        name = text.split("is")[-1].strip().capitalize()
+        memory[user_id].append({"role": "system", "name": name})
+        reply = f"Nice to meet you, {name}!"
+    
+    # 3️⃣ Recall last question
+    elif "last question" in text_lower:
+        prev_msgs = [m["text"] for m in user_history if m["role"] == "user"]
+        if len(prev_msgs) > 1:
+            reply = f"Your last question was: '{prev_msgs[-2]}'"
+        else:
+            reply = "I don’t remember any previous question yet."
+    
+    # 4️⃣ Default response
+    else:
+        reply = f"I heard: {text}"
+
+    # Save assistant reply
+    memory[user_id].append({"role": "assistant", "text": reply})
+
+    return {"reply": reply, "memory_hits": user_history}

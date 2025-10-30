@@ -1,0 +1,21 @@
+# Ignore virtual environments
+.venv/
+venv/
+venv311/
+
+# Ignore node modules
+frontend/node_modules/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore environment files
+.env
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
